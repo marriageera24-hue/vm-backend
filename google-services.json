@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "682394472619",
+    "project_id": "vadar-matrimony",
+    "storage_bucket": "vadar-matrimony.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:682394472619:android:c1cf20e1926fbb08fa67ee",
+        "android_client_info": {
+          "package_name": "com.vmatrimony.herokuapp.vadar_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "682394472619-j91nleansj6pgr0v274dr27bh75ouagd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtgnAi01ND3Sn0xxRpYPlf5aNICnS6_h4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "682394472619-j91nleansj6pgr0v274dr27bh75ouagd.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
