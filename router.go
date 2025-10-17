@@ -31,44 +31,51 @@ func startServer() {
 
 	objects := []string{"users", "email_templates"}
 	for _, s := range objects {
-		e.POST("/"+s, apiCreateHandler, jwtAuth)
-		e.POST("/"+s+"/search", apiSearchHandler, jwtAuth)
-		e.POST("/"+s+"/bulk", apiBulkReadHandler, jwtAuth)
-		e.GET("/"+s+"/:uuid", apiReadHandler, jwtAuth)
-		e.PATCH("/"+s+"/:uuid", apiUpdateHandler, jwtAuth)
-		e.DELETE("/"+s+"/:uuid", apiDeleteHandler, jwtAuth)
-		e.POST("/"+s+"/:uuid/restore", apiRestoreHandler, jwtAuth)
+		e.POST("/api/"+s, apiCreateHandler, jwtAuth)
+		e.POST("/api/"+s+"/search", apiSearchHandler, jwtAuth)
+		e.POST("/api/"+s+"/bulk", apiBulkReadHandler, jwtAuth)
+		e.GET("/api/"+s+"/:uuid", apiReadHandler, jwtAuth)
+		e.PATCH("/api/"+s+"/:uuid", apiUpdateHandler, jwtAuth)
+		e.DELETE("/api/"+s+"/:uuid", apiDeleteHandler, jwtAuth)
+		e.POST("/api/"+s+"/:uuid/restore", apiRestoreHandler, jwtAuth)
 	}
+	e.GET("/api/admin/users/search", apiAdminSearchHandler, httpAuth)
+	e.DELETE("/api/admin/users/delete", apiAdminDeleteHandler, httpAuth)
+	e.POST("/api/admin/users/verify", userVerifyHandler, httpAuth)
+	e.POST("/api/admin/users/unverify", userUnverifyHandler, httpAuth)   // Open endpoint
+	e.PATCH("/api/admin/users/update", userAdminUpdateHandler, httpAuth) // Open endpoint
 
 	// Users
-	e.POST("/users/register", userRegisterHandler)                   // Open endpoint
-	e.POST("/users/login/password", sessionsLoginPasswordHandler)    // Open endpoint
-	e.POST("/users/login/send-email", sessionsLoginSendEmailHandler) // Open endpoint
-	e.POST("/users/login/email", sessionsLoginEmailHandler)          // Open endpoint
-	e.GET("/users/exists/:info", userExistsHandler)                  // Open endpoint
-	e.POST("/users/search/count", (User{}).Count, jwtAuth)
+	e.POST("/api/users/register", userRegisterHandler)                   // Open endpoint
+	e.POST("/api/users/login/password", sessionsLoginPasswordHandler)    // Open endpoint
+	e.POST("/api/users/login/send-email", sessionsLoginSendEmailHandler) // Open endpoint
+	e.POST("/api/users/login/email", sessionsLoginEmailHandler)          // Open endpoint
+	e.GET("/api/users/exists/:info", userExistsHandler)                  // Open endpoint
+	e.POST("/api/users/search/count", (User{}).Count, jwtAuth)
 
-	e.POST("/users/forgot", passwordForgotHandler)                        // Open endpoint
-	e.POST("/users/reset", passwordResetHandler)                          // Open endpoint
-	e.GET("/users/me", userGetHandler, jwtAuth)                           // Open endpoint
-	e.PUT("/users/me", userUpdateHandler, jwtAuth)                        // Open endpoint
-	e.PATCH("/users/me", userPatchHandler, jwtAuth)                       // Open endpoint
-	e.POST("/users/verify", userVerifyHandler, jwtAuth)                   // Open endpoint
-	e.POST("/users/me/send-verify/:type", userSendVerifyHandler, jwtAuth) // Open endpoint // type (otp|email)
-	e.POST("/users/me/logout", sessionsLogoutHandler, jwtAuth)            // Open endpoint
+	e.POST("/api/users/forgot", passwordForgotHandler) // Open endpoint
+	e.POST("/api/users/reset", passwordResetHandler)   // Open endpoint
+	e.GET("/api/users/me", userGetHandler, jwtAuth)
+	e.POST("/api/users/delete", userDeleteHandler, jwtAuth)                   // Open endpoint
+	e.PUT("/api/users/me", userUpdateHandler, jwtAuth)                        // Open endpoint
+	e.PATCH("/api/users/me", userPatchHandler, jwtAuth)                       // Open endpoint
+	e.POST("/api/users/me/send-verify/:type", userSendVerifyHandler, jwtAuth) // Open endpoint // type (otp|email)
+	e.POST("/api/users/me/logout", sessionsLogoutHandler, jwtAuth)            // Open endpoint
 	// e.POST("/users/me/subscriptions", userSubscriptionsHandler) // Open endpoint
 	// e.POST("/users/me/resubscribe", userResubscribeHandler) // Open endpoint
 
-	e.GET("/users/me/interests", interests, jwtAuth)
-	e.GET("/users/me/interested", interested, jwtAuth)
-	e.POST("/users/me/interest", addInterest, jwtAuth)
+	e.GET("/api/users/me/interests", interests, jwtAuth)
+	e.GET("/api/users/me/interested", interested, jwtAuth)
+	e.POST("/api/users/me/interest", addInterest, jwtAuth)
 
-	e.POST("/users/media/:type/:uuid", upload, jwtAuth)
-	e.GET("/users/media/:uuid", download, jwtAuth)
+	e.POST("/api/users/media/:type/:uuid", upload, jwtAuth)
+	e.GET("/api/users/media/:uuid", download, jwtAuth)
+	e.POST("/api/users/payments", savePayments, jwtAuth)
+	e.GET("/api/users/balance", getBalance, jwtAuth)
 	// e.GET("/users/media/:id", download, jwtAuth)
 
-	e.GET("/ping", pingHandler)
-	e.GET("/lists", listAPIHandler, jwtAuth)
+	e.GET("/api/ping", pingHandler)
+	e.GET("/api/lists", listAPIHandler, jwtAuth)
 
 	e.GET("/*", redirectHandler)
 
@@ -76,8 +83,8 @@ func startServer() {
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:     origins,
-		AllowMethods:     []string{echo.OPTIONS, echo.POST},
-		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+		AllowMethods:     []string{echo.OPTIONS, echo.POST, echo.DELETE, echo.PATCH},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 		AllowCredentials: true,
 		MaxAge:           10,
 	}))
@@ -94,6 +101,7 @@ func startServer() {
 	e.Use(middleware.Secure())
 
 	port := os.Getenv("PORT")
+	print("port: ", port)
 
 	if port == "" {
 		log.Fatal("$PORT must be set")

@@ -8,7 +8,6 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/tomasen/realip"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func userGetHandler(ctx echo.Context) error {
@@ -21,6 +20,26 @@ func userGetHandler(ctx echo.Context) error {
 
 	db.Model(&Media{}).Where("user_uuid = ?", u.UUID).Find(&u.UserMedia)
 	return ctx.JSON(http.StatusOK, u)
+}
+
+func userDeleteHandler(ctx echo.Context) error {
+	var (
+		u   User
+		err error
+	)
+
+	u, err = verifySession(ctx)
+	if err != nil {
+		return ctx.JSON(http.StatusUnauthorized, err.Error())
+	}
+
+	db.Model(&u).Updates(map[string]interface{}{"deleted_at": time.Now()})
+
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	return ctx.JSON(http.StatusOK, gettext("User deleted", ctx))
 }
 
 func userRegisterHandler(ctx echo.Context) error {
@@ -183,6 +202,81 @@ func userUpdateHandler(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, new)
 }
 
+func userAdminUpdateHandler(ctx echo.Context) error {
+	var (
+		data struct {
+			FirstName        string          `json:"first_name"`
+			LastName         string          `json:"last_name"`
+			Email            string          `json:"email"`
+			Phone            string          `json:"phone"`
+			SubCaste         interface{}     `json:"sub_caste"`
+			Address1         string          `json:"address_1"`
+			Address2         string          `json:"address_2"`
+			City             string          `json:"city"`
+			State            string          `json:"state"`
+			Country          string          `json:"country"`
+			DateOfBirth      string          `json:"date_of_birth"`
+			Gender           interface{}     `json:"gender"`
+			MaritalStatus    interface{}     `json:"marital_status"`
+			OrganizationName string          `json:"organization_name"`
+			Industry         string          `json:"industry"`
+			EducationalInfo  json.RawMessage `json:"educationl_info"`
+			UUID             string          `json:"uuid"`
+		}
+	)
+	err := ctx.Bind(&data)
+	if err != nil {
+		return returnInvalidData(ctx, err)
+	}
+
+	if data.UUID == "" {
+		return ctx.JSON(http.StatusUnprocessableEntity, map[string]string{"error": "Missing required field: uuid"})
+	}
+
+	// Start a transaction
+	tx := db.Begin()
+	if tx.Error != nil {
+		ctx.Logger().Errorf("Failed to begin transaction: %v", tx.Error)
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Database error"})
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// --- 1. Update the USERS Table ---
+	userUpdateQuery := `
+        UPDATE users
+        SET 
+            first_name = $1, last_name = $2, email = $3, phone = $4, 
+            sub_caste = $5, address1 = $6, address2 = $7, city = $8, 
+            state = $9, country = $10, dob = $11, gender = $12, 
+            marital_status = $13, organization_name = $14, industry = $15   
+			WHERE uuid = $16
+    `
+	// Execute with Gorm's Exec, passing the required parameters
+	result := tx.Exec(
+		userUpdateQuery,
+		data.FirstName, data.LastName, data.Email, data.Phone,
+		data.SubCaste, data.Address1, data.Address2, data.City,
+		data.State, data.Country, data.DateOfBirth, data.Gender,
+		data.MaritalStatus, data.OrganizationName, data.Industry, data.UUID,
+	)
+	if result.Error != nil {
+		tx.Rollback()
+		ctx.Logger().Errorf("Error updating users table: %v", result.Error)
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update profile data."})
+	}
+	if result.RowsAffected == 0 {
+		tx.Rollback()
+		return ctx.JSON(http.StatusNotFound, map[string]string{"error": "User not found."})
+	}
+	tx.Commit()
+	return ctx.JSON(http.StatusOK, data)
+
+}
+
 func userPatchHandler(ctx echo.Context) error {
 	var (
 		data struct {
@@ -237,11 +331,14 @@ func userPatchHandler(ctx echo.Context) error {
 
 func userVerifyHandler(ctx echo.Context) error {
 	var (
-		u    User
-		err  error
+		u   User
+		err error
+		// data struct {
+		// 	Email string `json:"email"`
+		// 	Token string `json:"token"`
+		// }
 		data struct {
-			Email string `json:"email"`
-			Token string `json:"token"`
+			Uuid string `json:"uuid"`
 		}
 	)
 
@@ -251,22 +348,69 @@ func userVerifyHandler(ctx echo.Context) error {
 		return returnInvalidData(ctx, err)
 	}
 
-	if db.Where("email ILIKE ?", data.Email).First(&u).RecordNotFound() {
-		return ctx.JSON(http.StatusBadRequest, gettext("Email not found", ctx))
-	}
+	// if db.Where("email ILIKE ?", data.Email).First(&u).RecordNotFound() {
+	// 	return ctx.JSON(http.StatusBadRequest, gettext("User not found", ctx))
+	// }
 
 	if u.IsVerified {
-		return ctx.JSON(http.StatusOK, gettext("You have already verified this email address", ctx))
+		return ctx.JSON(http.StatusOK, gettext("You have already verified this user", ctx))
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(u.VerificationHash), []byte(data.Token))
+	// err = bcrypt.CompareHashAndPassword([]byte(u.VerificationHash), []byte(data.Token))
+	// if err != nil {
+
+	// 	return ctx.JSON(http.StatusBadRequest, gettext("Verification token is invalid", ctx))
+	// }
+
+	// Start with db.Model(&User{}) to ensure a clean slate
+	result := db.Exec("UPDATE users SET is_verified = ? WHERE uuid = ?", true, data.Uuid)
+	if result.Error != nil {
+		// There was a database execution error.
+		return ctx.JSON(http.StatusInternalServerError, result.Error.Error())
+	}
+	return ctx.JSON(http.StatusOK, gettext("User has been verified", ctx))
+}
+
+func userUnverifyHandler(ctx echo.Context) error {
+	var (
+		u   User
+		err error
+		// data struct {
+		// 	Email string `json:"email"`
+		// 	Token string `json:"token"`
+		// }
+		data struct {
+			Uuid string `json:"uuid"`
+		}
+	)
+
+	// Populate object from JSON
+	err = ctx.Bind(&data)
 	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, gettext("Verification token is invalid", ctx))
+		return returnInvalidData(ctx, err)
 	}
 
-	db.Model(&u).Updates(map[string]interface{}{"is_verified": true, "verification_hash": ""})
+	// if db.Where("email ILIKE ?", data.Email).First(&u).RecordNotFound() {
+	// 	return ctx.JSON(http.StatusBadRequest, gettext("User not found", ctx))
+	// }
 
-	return ctx.JSON(http.StatusOK, gettext("Your email address has been verified", ctx))
+	if u.IsVerified {
+		return ctx.JSON(http.StatusOK, gettext("You have already verified this user", ctx))
+	}
+
+	// err = bcrypt.CompareHashAndPassword([]byte(u.VerificationHash), []byte(data.Token))
+	// if err != nil {
+
+	// 	return ctx.JSON(http.StatusBadRequest, gettext("Verification token is invalid", ctx))
+	// }
+
+	// Start with db.Model(&User{}) to ensure a clean slate
+	result := db.Exec("UPDATE users SET is_verified = ? WHERE uuid = ?", false, data.Uuid)
+	if result.Error != nil {
+		// There was a database execution error.
+		return ctx.JSON(http.StatusInternalServerError, result.Error.Error())
+	}
+	return ctx.JSON(http.StatusOK, gettext("User has been verified", ctx))
 }
 
 func userSendVerifyHandler(ctx echo.Context) error {
