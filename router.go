@@ -39,8 +39,7 @@ func startServer() {
 		e.DELETE("/"+s+"/:uuid", apiDeleteHandler, jwtAuth)
 		e.POST("/"+s+"/:uuid/restore", apiRestoreHandler, jwtAuth)
 	}
-	e.GET("/admin/users/search", apiAdminSearchHandler, httpAuth)
-	e.DELETE("/admin/users/delete", apiAdminDeleteHandler, httpAuth)
+
 	// Users
 	e.POST("/users/register", userRegisterHandler)                   // Open endpoint
 	e.POST("/users/login/password", sessionsLoginPasswordHandler)    // Open endpoint
@@ -49,14 +48,12 @@ func startServer() {
 	e.GET("/users/exists/:info", userExistsHandler)                  // Open endpoint
 	e.POST("/users/search/count", (User{}).Count, jwtAuth)
 
-	e.POST("/users/forgot", passwordForgotHandler) // Open endpoint
-	e.POST("/users/reset", passwordResetHandler)   // Open endpoint
-	e.GET("/users/me", userGetHandler, jwtAuth)
-	e.POST("users/delete", userDeleteHandler, jwtAuth) // Open endpoint
-	e.PUT("/users/me", userUpdateHandler, jwtAuth)     // Open endpoint
-	e.PATCH("/users/me", userPatchHandler, jwtAuth)    // Open endpoint
-	e.POST("/admin/users/verify", userVerifyHandler, httpAuth)
-	e.POST("/admin/users/unverify", userUnverifyHandler, httpAuth)        // Open endpoint
+	e.POST("/users/forgot", passwordForgotHandler)                        // Open endpoint
+	e.POST("/users/reset", passwordResetHandler)                          // Open endpoint
+	e.GET("/users/me", userGetHandler, jwtAuth)                           // Open endpoint
+	e.PUT("/users/me", userUpdateHandler, jwtAuth)                        // Open endpoint
+	e.PATCH("/users/me", userPatchHandler, jwtAuth)                       // Open endpoint
+	e.POST("/users/verify", userVerifyHandler, jwtAuth)                   // Open endpoint
 	e.POST("/users/me/send-verify/:type", userSendVerifyHandler, jwtAuth) // Open endpoint // type (otp|email)
 	e.POST("/users/me/logout", sessionsLogoutHandler, jwtAuth)            // Open endpoint
 	// e.POST("/users/me/subscriptions", userSubscriptionsHandler) // Open endpoint
@@ -68,8 +65,6 @@ func startServer() {
 
 	e.POST("/users/media/:type/:uuid", upload, jwtAuth)
 	e.GET("/users/media/:uuid", download, jwtAuth)
-	e.POST("/users/payments", savePayments, jwtAuth)
-	e.GET("/users/balance", getBalance, jwtAuth)
 	// e.GET("/users/media/:id", download, jwtAuth)
 
 	e.GET("/ping", pingHandler)
@@ -81,8 +76,8 @@ func startServer() {
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:     origins,
-		AllowMethods:     []string{echo.OPTIONS, echo.POST, echo.DELETE},
-		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+		AllowMethods:     []string{echo.OPTIONS, echo.POST},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
 		AllowCredentials: true,
 		MaxAge:           10,
 	}))

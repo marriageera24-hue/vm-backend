@@ -2,12 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
-	"log"
 	"net/http"
 
-	"github.com/jinzhu/gorm"
 	"github.com/labstack/echo"
 )
 
@@ -122,38 +118,6 @@ func apiSearchHandler(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, items)
 }
 
-// Assuming DBConn *sql.DB is globally available or passed to the handler
-func apiAdminSearchHandler(ctx echo.Context) error {
-
-	// 1. Authentication is handled by middleware (httpAuth)
-
-	// 2. Bind the query parameters (from URL query string)
-	// var params SearchQuery
-	// if err := ctx.Bind(&params); err != nil {
-	// 	return ctx.JSON(http.StatusBadRequest, "Invalid query parameters: "+err.Error())
-	// }
-
-	// 3. (Optional) Enforce default limit
-	// if params.Limit <= 0 || params.Limit > 50 {
-	// 	params.Limit = 10
-	// }
-
-	// 4. --- START: DIRECT DB LOGIC ---
-	var users []User
-
-	db = db.Where("deleted_at IS NULL").Order("id DESC")
-	// .Find(&users) executes the query and scans results directly into the slice
-	/*************  ✨ Windsurf Command 🌟  *************/
-	result := db.Find(&users)
-	/*******  17322107-6f58-4f23-8112-37095443682f  *******/
-	if result.Error != nil {
-		log.Printf("PostgreSQL GORM Query Error: %v", result.Error)
-		return ctx.JSON(http.StatusInternalServerError, fmt.Sprintf("DB query failed: %v", result.Error))
-	}
-	// 5. Success
-	return ctx.JSON(http.StatusOK, users)
-}
-
 func apiUpdateHandler(ctx echo.Context) error {
 	var err error
 
@@ -224,48 +188,6 @@ func apiDeleteHandler(ctx echo.Context) error {
 	tx.Commit()
 
 	return ctx.NoContent(http.StatusOK)
-}
-
-func apiAdminDeleteHandler(ctx echo.Context) error {
-	// 1. Declare the variable as a single struct, not a slice.
-	var (
-		user User
-		err  error
-		// data struct {
-		// 	Email string `json:"email"`
-		// 	Token string `json:"token"`
-		// }
-		data struct {
-			Uuid string `json:"uuid"`
-		}
-	)
-
-	err = ctx.Bind(&data)
-	if err != nil {
-		return returnInvalidData(ctx, err)
-	}
-	print("in error 238")
-	print(ctx.Param("uuid"))
-	// 2. Fetch the user's record into the struct. Pass the pointer to GORM.
-	// If successful, 'user' struct is populated.
-	result := db.Where("uuid = ?", data.Uuid).First(&user) // Pass pointer: &user
-
-	// 3. Check the result for errors (including not found)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return ctx.NoContent(http.StatusNotFound) // Return 404 if not found
-		}
-		// Handle other DB errors (e.g., connection issues)
-		return ctx.JSON(http.StatusInternalServerError, "Database error during fetch")
-	}
-
-	// 5. Delete the *fetched* struct. GORM uses the struct's ID for the WHERE clause.
-	res := db.Exec("UPDATE users SET deleted_at = now() WHERE uuid = ?", data.Uuid)
-	if res.Error != nil {
-		// There was a database execution error.
-		return ctx.JSON(http.StatusInternalServerError, result.Error.Error())
-	}
-	return ctx.JSON(http.StatusOK, gettext("User has been Deleted", ctx))
 }
 
 func apiRestoreHandler(ctx echo.Context) error {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/tomasen/realip"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func userGetHandler(ctx echo.Context) error {
@@ -19,29 +20,9 @@ func userGetHandler(ctx echo.Context) error {
 	}
 
 	db.Model(&Media{}).Where("user_uuid = ?", u.UUID).Find(&u.UserMedia)
-	db.Model(&Wallet{}).Where("user_uuid = ?", u.UUID).Find(&u.UserWallet)
 	return ctx.JSON(http.StatusOK, u)
 }
 
-func userDeleteHandler(ctx echo.Context) error {
-	var (
-		u   User
-		err error
-	)
-
-	u, err = verifySession(ctx)
-	if err != nil {
-		return ctx.JSON(http.StatusUnauthorized, err.Error())
-	}
-
-	db.Model(&u).Updates(map[string]interface{}{"deleted_at": time.Now()})
-
-	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, err.Error())
-	}
-
-	return ctx.JSON(http.StatusOK, gettext("User deleted", ctx))
-}
 func userRegisterHandler(ctx echo.Context) error {
 	var (
 		data struct {
@@ -256,14 +237,11 @@ func userPatchHandler(ctx echo.Context) error {
 
 func userVerifyHandler(ctx echo.Context) error {
 	var (
-		u   User
-		err error
-		// data struct {
-		// 	Email string `json:"email"`
-		// 	Token string `json:"token"`
-		// }
+		u    User
+		err  error
 		data struct {
-			Uuid string `json:"uuid"`
+			Email string `json:"email"`
+			Token string `json:"token"`
 		}
 	)
 
@@ -273,69 +251,22 @@ func userVerifyHandler(ctx echo.Context) error {
 		return returnInvalidData(ctx, err)
 	}
 
-	// if db.Where("email ILIKE ?", data.Email).First(&u).RecordNotFound() {
-	// 	return ctx.JSON(http.StatusBadRequest, gettext("User not found", ctx))
-	// }
+	if db.Where("email ILIKE ?", data.Email).First(&u).RecordNotFound() {
+		return ctx.JSON(http.StatusBadRequest, gettext("Email not found", ctx))
+	}
 
 	if u.IsVerified {
-		return ctx.JSON(http.StatusOK, gettext("You have already verified this user", ctx))
+		return ctx.JSON(http.StatusOK, gettext("You have already verified this email address", ctx))
 	}
 
-	// err = bcrypt.CompareHashAndPassword([]byte(u.VerificationHash), []byte(data.Token))
-	// if err != nil {
-
-	// 	return ctx.JSON(http.StatusBadRequest, gettext("Verification token is invalid", ctx))
-	// }
-
-	// Start with db.Model(&User{}) to ensure a clean slate
-	result := db.Exec("UPDATE users SET is_verified = ? WHERE uuid = ?", true, data.Uuid)
-	if result.Error != nil {
-		// There was a database execution error.
-		return ctx.JSON(http.StatusInternalServerError, result.Error.Error())
-	}
-	return ctx.JSON(http.StatusOK, gettext("User has been verified", ctx))
-}
-
-func userUnverifyHandler(ctx echo.Context) error {
-	var (
-		u   User
-		err error
-		// data struct {
-		// 	Email string `json:"email"`
-		// 	Token string `json:"token"`
-		// }
-		data struct {
-			Uuid string `json:"uuid"`
-		}
-	)
-
-	// Populate object from JSON
-	err = ctx.Bind(&data)
+	err = bcrypt.CompareHashAndPassword([]byte(u.VerificationHash), []byte(data.Token))
 	if err != nil {
-		return returnInvalidData(ctx, err)
+		return ctx.JSON(http.StatusBadRequest, gettext("Verification token is invalid", ctx))
 	}
 
-	// if db.Where("email ILIKE ?", data.Email).First(&u).RecordNotFound() {
-	// 	return ctx.JSON(http.StatusBadRequest, gettext("User not found", ctx))
-	// }
+	db.Model(&u).Updates(map[string]interface{}{"is_verified": true, "verification_hash": ""})
 
-	if u.IsVerified {
-		return ctx.JSON(http.StatusOK, gettext("You have already verified this user", ctx))
-	}
-
-	// err = bcrypt.CompareHashAndPassword([]byte(u.VerificationHash), []byte(data.Token))
-	// if err != nil {
-
-	// 	return ctx.JSON(http.StatusBadRequest, gettext("Verification token is invalid", ctx))
-	// }
-
-	// Start with db.Model(&User{}) to ensure a clean slate
-	result := db.Exec("UPDATE users SET is_verified = ? WHERE uuid = ?", false, data.Uuid)
-	if result.Error != nil {
-		// There was a database execution error.
-		return ctx.JSON(http.StatusInternalServerError, result.Error.Error())
-	}
-	return ctx.JSON(http.StatusOK, gettext("User has been verified", ctx))
+	return ctx.JSON(http.StatusOK, gettext("Your email address has been verified", ctx))
 }
 
 func userSendVerifyHandler(ctx echo.Context) error {
